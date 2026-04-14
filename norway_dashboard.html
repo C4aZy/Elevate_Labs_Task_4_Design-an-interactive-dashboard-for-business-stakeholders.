@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Norway EV Market Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --bg2: #111827;
+    --bg3: #1a2235;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #e8eaf0;
+    --muted: #6b7694;
+    --dim: #3a4460;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --green: #10b981;
+    --red: #f43f5e;
+    --amber: #f59e0b;
+    --navy: #1e3a5f;
+    --font-head: 'Syne', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 14px; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-head);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Noise texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.5;
+  }
+
+  /* TOP NAV */
+  .nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    height: 58px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(10,14,26,0.9);
+    backdrop-filter: blur(12px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+  .nav-flag {
+    font-size: 18px;
+    line-height: 1;
+  }
+  .nav-tabs {
+    display: flex;
+    gap: 2px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+  }
+  .nav-tab {
+    padding: 6px 18px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: all 0.18s;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .nav-tab:hover { color: var(--text); background: var(--bg3); }
+  .nav-tab.active { background: var(--accent); color: #000; }
+  .nav-meta {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+  }
+
+  /* FILTERS BAR */
+  .filters-bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+    flex-wrap: wrap;
+  }
+  .filters-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-right: 4px;
+  }
+  .filter-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .filter-group label {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+  }
+  select, input[type=range] {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 5px 10px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  select:hover, select:focus { border-color: var(--accent); }
+  select option { background: var(--bg2); }
+  .year-slider-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 120px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--dim);
+    padding: 0;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(0,212,255,0.5);
+  }
+  .range-val {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--accent);
+    min-width: 36px;
+  }
+  .reset-btn {
+    margin-left: auto;
+    padding: 5px 14px;
+    background: transparent;
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--muted);
+    font-family: var(--font-head);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.05em;
+  }
+  .reset-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* MAIN LAYOUT */
+  .main {
+    padding: 24px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* PAGE SECTIONS */
+  .page { display: none; }
+  .page.active { display: contents; }
+
+  /* KPI ROW */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+  .kpi-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.2s;
+    cursor: default;
+  }
+  .kpi-card:hover {
+    border-color: var(--border2);
+    transform: translateY(-2px);
+  }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--kpi-accent, var(--accent));
+    border-radius: 12px 12px 0 0;
+  }
+  .kpi-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .kpi-value {
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--text);
+    margin-bottom: 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .kpi-sub {
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+  }
+  .kpi-sub .badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .badge-green { background: rgba(16,185,129,0.15); color: var(--green); }
+  .badge-red { background: rgba(244,63,94,0.15); color: var(--red); }
+  .badge-amber { background: rgba(245,158,11,0.15); color: var(--amber); }
+  .badge-blue { background: rgba(0,212,255,0.12); color: var(--accent); }
+  .kpi-sparkline { margin-top: 10px; height: 32px; }
+
+  /* CHART CARDS */
+  .chart-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 22px;
+    position: relative;
+  }
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 18px;
+    gap: 12px;
+  }
+  .chart-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.01em;
+  }
+  .chart-sub {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    margin-top: 3px;
+  }
+  .chart-legend {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .legend-item:hover { color: var(--text); }
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .legend-line {
+    width: 20px;
+    height: 2px;
+    border-radius: 1px;
+    flex-shrink: 0;
+  }
+  .chart-canvas-wrap { position: relative; }
+
+  /* GRID LAYOUTS */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .grid-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+  .grid-1-2 { display: grid; grid-template-columns: 1fr 2fr; gap: 14px; }
+
+  /* TABLE */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    font-family: var(--font-mono);
+  }
+  .data-table th {
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .data-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    transition: background 0.12s;
+  }
+  .data-table tr:hover td { background: rgba(255,255,255,0.03); }
+  .data-table tr:last-child td { border-bottom: none; }
+  .tbl-bar {
+    display: inline-block;
+    height: 3px;
+    border-radius: 2px;
+    vertical-align: middle;
+    margin-left: 8px;
+    transition: width 0.4s ease;
+  }
+  .tbl-pos { color: var(--green); }
+  .tbl-neg { color: var(--red); }
+
+  /* HEATMAP */
+  .heatmap-grid {
+    display: grid;
+    grid-template-columns: 40px repeat(12, 1fr);
+    gap: 3px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+  }
+  .hm-cell {
+    height: 28px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,0.8);
+    font-size: 9px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.12s;
+    position: relative;
+  }
+  .hm-cell:hover {
+    transform: scale(1.12);
+    z-index: 10;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  }
+  .hm-label { color: var(--muted); display: flex; align-items: center; }
+  .hm-header { color: var(--muted); display: flex; align-items: center; justify-content: center; }
+
+  /* TOOLTIP */
+  #tooltip {
+    position: fixed;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text);
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.12s;
+    max-width: 200px;
+    line-height: 1.7;
+  }
+  #tooltip.visible { opacity: 1; }
+  #tooltip strong { color: var(--accent); font-weight: 600; }
+
+  /* SECTION DIVIDER */
+  .section-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: -6px;
+  }
+
+  /* PULSE BADGE */
+  .live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--green);
+    background: rgba(16,185,129,0.1);
+    border: 1px solid rgba(16,185,129,0.25);
+    padding: 3px 8px;
+    border-radius: 20px;
+  }
+  .live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  /* ANIMATIONS */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .kpi-card { animation: fadeUp 0.4s ease both; }
+  .kpi-card:nth-child(1) { animation-delay: 0.05s; }
+  .kpi-card:nth-child(2) { animation-delay: 0.1s; }
+  .kpi-card:nth-child(3) { animation-delay: 0.15s; }
+  .kpi-card:nth-child(4) { animation-delay: 0.2s; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  /* CO2 PAGE */
+  .co2-gauge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 0 10px;
+  }
+  .gauge-value {
+    font-size: 48px;
+    font-weight: 800;
+    color: var(--text);
+    text-align: center;
+    line-height: 1;
+  }
+  .gauge-label {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    font-family: var(--font-mono);
+    margin-top: 6px;
+  }
+
+  /* RESPONSIVE FALLBACK */
+  @media (max-width: 900px) {
+    .kpi-row { grid-template-columns: 1fr 1fr; }
+    .grid-2, .grid-2-1, .grid-1-2, .grid-3 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div id="tooltip"></div>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-brand">
+    <span class="nav-flag">🇳🇴</span>
+    Norway EV Market
+    <span class="live-badge"><span class="live-dot"></span>2007–2016</span>
+  </div>
+  <div class="nav-tabs">
+    <div class="nav-tab active" onclick="showPage('overview')">Overview</div>
+    <div class="nav-tab" onclick="showPage('ev')">EV &amp; Hybrid</div>
+    <div class="nav-tab" onclick="showPage('emissions')">Emissions</div>
+    <div class="nav-tab" onclick="showPage('growth')">Growth</div>
+  </div>
+  <div class="nav-meta" id="filter-summary">All years · All months</div>
+</nav>
+
+<!-- FILTERS -->
+<div class="filters-bar">
+  <span class="filters-label">Filters</span>
+  <div class="filter-group">
+    <label>Year from</label>
+    <input type="range" id="year-from" min="2007" max="2016" value="2007" step="1" oninput="onFilterChange()">
+    <span class="range-val" id="year-from-val">2007</span>
+  </div>
+  <div class="filter-group">
+    <label>to</label>
+    <input type="range" id="year-to" min="2007" max="2016" value="2016" step="1" oninput="onFilterChange()">
+    <span class="range-val" id="year-to-val">2016</span>
+  </div>
+  <div class="filter-group">
+    <label>Month</label>
+    <select id="month-filter" onchange="onFilterChange()">
+      <option value="all">All months</option>
+      <option value="1">January</option><option value="2">February</option>
+      <option value="3">March</option><option value="4">April</option>
+      <option value="5">May</option><option value="6">June</option>
+      <option value="7">July</option><option value="8">August</option>
+      <option value="9">September</option><option value="10">October</option>
+      <option value="11">November</option><option value="12">December</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Metric</label>
+    <select id="metric-filter" onchange="onFilterChange()">
+      <option value="qty">Total Sales</option>
+      <option value="electric">Electric</option>
+      <option value="hybrid">Hybrid</option>
+      <option value="diesel">Diesel</option>
+    </select>
+  </div>
+  <button class="reset-btn" onclick="resetFilters()">↺ Reset</button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- ======================== OVERVIEW PAGE ======================== -->
+  <div class="page active" id="page-overview">
+
+    <!-- KPIs -->
+    <div class="kpi-row" id="kpi-row"></div>
+
+    <!-- Time series + donut -->
+    <div class="grid-2-1">
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Monthly sales volume</div>
+            <div class="chart-sub">New car registrations per month</div>
+          </div>
+          <div class="chart-legend">
+            <div class="legend-item"><div class="legend-line" style="background:#00d4ff"></div> Total</div>
+            <div class="legend-item"><div class="legend-line" style="background:#10b981"></div> Electric</div>
+            <div class="legend-item"><div class="legend-line" style="background:#7c3aed; border-top: 2px dashed #7c3aed; background: none; height:0"></div> Hybrid</div>
+          </div>
+        </div>
+        <div class="chart-canvas-wrap"><canvas id="timeseries-chart" height="220"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Sales mix</div>
+            <div class="chart-sub">Selected period</div>
+          </div>
+        </div>
+        <div class="chart-canvas-wrap"><canvas id="donut-chart" height="200"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Bar chart + heatmap -->
+    <div class="grid-2">
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Annual sales by fuel type</div>
+            <div class="chart-sub">Stacked bars — click to highlight year</div>
+          </div>
+        </div>
+        <div class="chart-canvas-wrap"><canvas id="stack-bar-chart" height="220"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Monthly sales heatmap</div>
+            <div class="chart-sub">Intensity = total registrations</div>
+          </div>
+        </div>
+        <div id="heatmap-wrap"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ======================== EV PAGE ======================== -->
+  <div class="page" id="page-ev">
+
+    <div class="kpi-row" id="ev-kpi-row"></div>
+
+    <div class="grid-2">
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">EV &amp; Hybrid units — annual</div>
+            <div class="chart-sub">Absolute units registered</div>
+          </div>
+        </div>
+        <div class="chart-canvas-wrap"><canvas id="ev-bar-chart" height="260"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">EV market share (%)</div>
+            <div class="chart-sub">Electric as % of total monthly sales</div>
+          </div>
+        </div>
+        <div class="chart-canvas-wrap"><canvas id="ev-share-chart" height="260"></canvas></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">EV adoption vs Diesel decline</div>
+          <div class="chart-sub">Annual units — opposite trend lines</div>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div> Electric</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#7c3aed"></div> Hybrid</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f43f5e"></div> Diesel</div>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap"><canvas id="ev-vs-diesel-chart" height="180"></canvas></div>
+    </div>
+
+  </div>
+
+  <!-- ======================== EMISSIONS PAGE ======================== -->
+  <div class="page" id="page-emissions">
+
+    <div class="kpi-row" id="co2-kpi-row"></div>
+
+    <div class="grid-2-1">
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Average CO₂ emissions over time</div>
+            <div class="chart-sub">Annual average g/km — all new registrations</div>
+          </div>
+        </div>
+        <div class="chart-canvas-wrap"><canvas id="co2-line-chart" height="240"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div>
+          <div class="chart-title" style="margin-bottom:14px">CO₂ reduction</div>
+          <div class="co2-gauge">
+            <div>
+              <div class="gauge-value" id="co2-reduction-val">—</div>
+              <div class="gauge-label">g/km reduction<br>over selected period</div>
+            </div>
+          </div>
+          <canvas id="co2-gauge-chart" height="150"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Diesel vs Bensin (Petrol) CO₂ monthly</div>
+          <div class="chart-sub">Average CO₂ per fuel type (g/km)</div>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#f43f5e"></div> Diesel</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div> Petrol</div>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap"><canvas id="fuel-co2-chart" height="180"></canvas></div>
+    </div>
+
+  </div>
+
+  <!-- ======================== GROWTH PAGE ======================== -->
+  <div class="page" id="page-growth">
+
+    <div class="kpi-row" id="growth-kpi-row"></div>
+
+    <div class="grid-2">
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Year-on-year growth (%)</div>
+            <div class="chart-sub">Annual total vs previous year</div>
+          </div>
+        </div>
+        <div class="chart-canvas-wrap"><canvas id="yoy-chart" height="260"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Annual totals — data table</div>
+            <div class="chart-sub">Click column headers to sort</div>
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table" id="data-table">
+            <thead>
+              <tr>
+                <th onclick="sortTable('year')">Year ↕</th>
+                <th onclick="sortTable('qty')">Total ↕</th>
+                <th onclick="sortTable('yoy')">YoY% ↕</th>
+                <th onclick="sortTable('electric')">Electric ↕</th>
+                <th onclick="sortTable('hybrid')">Hybrid ↕</th>
+                <th onclick="sortTable('co2')">Avg CO₂ ↕</th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Month-on-month variation — seasonality</div>
+          <div class="chart-sub">Average sales per calendar month across all years</div>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap"><canvas id="seasonality-chart" height="160"></canvas></div>
+    </div>
+
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ─── DATA ───────────────────────────────────────────────────────────────────
+const MONTHLY = [
+  {Year:2007,Month:1,Quantity:12685,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:10072,Avg_CO2:152,Diesel_Share:79.4,Electric_Share:0},{Year:2007,Month:2,Quantity:9793,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:7222,Avg_CO2:156,Diesel_Share:73.7,Electric_Share:0},{Year:2007,Month:3,Quantity:11264,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:7965,Avg_CO2:159,Diesel_Share:70.7,Electric_Share:0},{Year:2007,Month:4,Quantity:8854,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:6124,Avg_CO2:160,Diesel_Share:69.2,Electric_Share:0},{Year:2007,Month:5,Quantity:12007,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:8270,Avg_CO2:158,Diesel_Share:68.9,Electric_Share:0},{Year:2007,Month:6,Quantity:11083,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:7764,Avg_CO2:157,Diesel_Share:70.1,Electric_Share:0},{Year:2007,Month:7,Quantity:12062,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:8580,Avg_CO2:161,Diesel_Share:71.1,Electric_Share:0},{Year:2007,Month:8,Quantity:10786,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:7738,Avg_CO2:160,Diesel_Share:71.7,Electric_Share:0},{Year:2007,Month:9,Quantity:9340,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:6660,Avg_CO2:160,Diesel_Share:71.3,Electric_Share:0},{Year:2007,Month:10,Quantity:11646,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:8384,Avg_CO2:161,Diesel_Share:72.0,Electric_Share:0},{Year:2007,Month:11,Quantity:9891,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:7254,Avg_CO2:162,Diesel_Share:73.3,Electric_Share:0},{Year:2007,Month:12,Quantity:9769,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:7004,Avg_CO2:161,Diesel_Share:71.7,Electric_Share:0},
+  {Year:2008,Month:1,Quantity:12283,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:9268,Avg_CO2:158,Diesel_Share:75.5,Electric_Share:0},{Year:2008,Month:2,Quantity:10150,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:7653,Avg_CO2:157,Diesel_Share:75.4,Electric_Share:0},{Year:2008,Month:3,Quantity:13063,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:9989,Avg_CO2:159,Diesel_Share:76.5,Electric_Share:0},{Year:2008,Month:4,Quantity:10420,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:7910,Avg_CO2:157,Diesel_Share:75.9,Electric_Share:0},{Year:2008,Month:5,Quantity:13209,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:9919,Avg_CO2:155,Diesel_Share:75.1,Electric_Share:0},{Year:2008,Month:6,Quantity:11449,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:8660,Avg_CO2:156,Diesel_Share:75.6,Electric_Share:0},{Year:2008,Month:7,Quantity:9901,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:7356,Avg_CO2:159,Diesel_Share:74.3,Electric_Share:0},{Year:2008,Month:8,Quantity:9038,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:6772,Avg_CO2:158,Diesel_Share:74.9,Electric_Share:0},{Year:2008,Month:9,Quantity:7700,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:5768,Avg_CO2:157,Diesel_Share:74.9,Electric_Share:0},{Year:2008,Month:10,Quantity:8576,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:6376,Avg_CO2:160,Diesel_Share:74.3,Electric_Share:0},{Year:2008,Month:11,Quantity:7536,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:5433,Avg_CO2:159,Diesel_Share:72.1,Electric_Share:0},{Year:2008,Month:12,Quantity:7292,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:5185,Avg_CO2:162,Diesel_Share:71.1,Electric_Share:0},
+  {Year:2009,Month:1,Quantity:6547,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:4578,Avg_CO2:155,Diesel_Share:69.9,Electric_Share:0},{Year:2009,Month:2,Quantity:6808,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:4907,Avg_CO2:153,Diesel_Share:72.1,Electric_Share:0},{Year:2009,Month:3,Quantity:8998,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:6471,Avg_CO2:152,Diesel_Share:71.9,Electric_Share:0},{Year:2009,Month:4,Quantity:8278,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:5923,Avg_CO2:151,Diesel_Share:71.6,Electric_Share:0},{Year:2009,Month:5,Quantity:9891,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:6930,Avg_CO2:148,Diesel_Share:70.1,Electric_Share:0},{Year:2009,Month:6,Quantity:9238,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:6512,Avg_CO2:149,Diesel_Share:70.5,Electric_Share:0},{Year:2009,Month:7,Quantity:8908,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:6295,Avg_CO2:150,Diesel_Share:70.7,Electric_Share:0},{Year:2009,Month:8,Quantity:9099,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:6402,Avg_CO2:148,Diesel_Share:70.4,Electric_Share:0},{Year:2009,Month:9,Quantity:8348,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:5898,Avg_CO2:149,Diesel_Share:70.7,Electric_Share:0},{Year:2009,Month:10,Quantity:9742,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:6839,Avg_CO2:150,Diesel_Share:70.2,Electric_Share:0},{Year:2009,Month:11,Quantity:8420,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:5982,Avg_CO2:150,Diesel_Share:71.0,Electric_Share:0},{Year:2009,Month:12,Quantity:9398,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:6609,Avg_CO2:148,Diesel_Share:70.3,Electric_Share:0},
+  {Year:2010,Month:1,Quantity:8373,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:6002,Avg_CO2:143,Diesel_Share:71.7,Electric_Share:0},{Year:2010,Month:2,Quantity:8908,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:6498,Avg_CO2:141,Diesel_Share:72.9,Electric_Share:0},{Year:2010,Month:3,Quantity:13753,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:10219,Avg_CO2:142,Diesel_Share:74.3,Electric_Share:0},{Year:2010,Month:4,Quantity:11008,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:8142,Avg_CO2:141,Diesel_Share:74.0,Electric_Share:0},{Year:2010,Month:5,Quantity:12903,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:9534,Avg_CO2:140,Diesel_Share:73.9,Electric_Share:0},{Year:2010,Month:6,Quantity:12079,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:9000,Avg_CO2:140,Diesel_Share:74.5,Electric_Share:0},{Year:2010,Month:7,Quantity:11006,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:8125,Avg_CO2:141,Diesel_Share:73.8,Electric_Share:0},{Year:2010,Month:8,Quantity:11001,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:8081,Avg_CO2:140,Diesel_Share:73.5,Electric_Share:0},{Year:2010,Month:9,Quantity:10951,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:8121,Avg_CO2:140,Diesel_Share:74.2,Electric_Share:0},{Year:2010,Month:10,Quantity:12283,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:9196,Avg_CO2:140,Diesel_Share:74.9,Electric_Share:0},{Year:2010,Month:11,Quantity:12094,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:9183,Avg_CO2:140,Diesel_Share:75.9,Electric_Share:0},{Year:2010,Month:12,Quantity:13395,Quantity_Electric:0,Quantity_Hybrid:0,Quantity_Diesel:10635,Avg_CO2:141,Diesel_Share:79.4,Electric_Share:0},
+  {Year:2011,Month:1,Quantity:10060,Quantity_Electric:61,Quantity_Hybrid:290,Quantity_Diesel:7532,Avg_CO2:136,Diesel_Share:74.9,Electric_Share:0.61},{Year:2011,Month:2,Quantity:10056,Quantity_Electric:81,Quantity_Hybrid:239,Quantity_Diesel:7474,Avg_CO2:135,Diesel_Share:74.3,Electric_Share:0.81},{Year:2011,Month:3,Quantity:13870,Quantity_Electric:191,Quantity_Hybrid:393,Quantity_Diesel:10255,Avg_CO2:134,Diesel_Share:73.9,Electric_Share:1.38},{Year:2011,Month:4,Quantity:10992,Quantity_Electric:132,Quantity_Hybrid:254,Quantity_Diesel:8291,Avg_CO2:135,Diesel_Share:75.4,Electric_Share:1.2},{Year:2011,Month:5,Quantity:13302,Quantity_Electric:193,Quantity_Hybrid:330,Quantity_Diesel:10068,Avg_CO2:133,Diesel_Share:75.7,Electric_Share:1.45},{Year:2011,Month:6,Quantity:12551,Quantity_Electric:214,Quantity_Hybrid:326,Quantity_Diesel:9345,Avg_CO2:133,Diesel_Share:74.5,Electric_Share:1.71},{Year:2011,Month:7,Quantity:11455,Quantity_Electric:190,Quantity_Hybrid:335,Quantity_Diesel:8608,Avg_CO2:134,Diesel_Share:75.1,Electric_Share:1.66},{Year:2011,Month:8,Quantity:11374,Quantity_Electric:193,Quantity_Hybrid:321,Quantity_Diesel:8533,Avg_CO2:134,Diesel_Share:75.0,Electric_Share:1.7},{Year:2011,Month:9,Quantity:11209,Quantity_Electric:206,Quantity_Hybrid:342,Quantity_Diesel:8560,Avg_CO2:133,Diesel_Share:76.4,Electric_Share:1.84},{Year:2011,Month:10,Quantity:12386,Quantity_Electric:211,Quantity_Hybrid:358,Quantity_Diesel:9426,Avg_CO2:133,Diesel_Share:76.1,Electric_Share:1.7},{Year:2011,Month:11,Quantity:11222,Quantity_Electric:197,Quantity_Hybrid:344,Quantity_Diesel:8441,Avg_CO2:133,Diesel_Share:75.2,Electric_Share:1.75},{Year:2011,Month:12,Quantity:9868,Quantity_Electric:127,Quantity_Hybrid:371,Quantity_Diesel:8016,Avg_CO2:134,Diesel_Share:81.2,Electric_Share:1.29},
+  {Year:2012,Month:1,Quantity:10084,Quantity_Electric:199,Quantity_Hybrid:349,Quantity_Diesel:7451,Avg_CO2:131,Diesel_Share:73.9,Electric_Share:1.97},{Year:2012,Month:2,Quantity:9909,Quantity_Electric:303,Quantity_Hybrid:393,Quantity_Diesel:7130,Avg_CO2:130,Diesel_Share:71.9,Electric_Share:3.06},{Year:2012,Month:3,Quantity:14073,Quantity_Electric:428,Quantity_Hybrid:531,Quantity_Diesel:10133,Avg_CO2:130,Diesel_Share:72.0,Electric_Share:3.04},{Year:2012,Month:4,Quantity:10920,Quantity_Electric:319,Quantity_Hybrid:442,Quantity_Diesel:7774,Avg_CO2:130,Diesel_Share:71.2,Electric_Share:2.92},{Year:2012,Month:5,Quantity:13148,Quantity_Electric:386,Quantity_Hybrid:519,Quantity_Diesel:9367,Avg_CO2:129,Diesel_Share:71.2,Electric_Share:2.94},{Year:2012,Month:6,Quantity:12256,Quantity_Electric:350,Quantity_Hybrid:552,Quantity_Diesel:8582,Avg_CO2:130,Diesel_Share:70.0,Electric_Share:2.86},{Year:2012,Month:7,Quantity:11177,Quantity_Electric:348,Quantity_Hybrid:520,Quantity_Diesel:7868,Avg_CO2:131,Diesel_Share:70.4,Electric_Share:3.11},{Year:2012,Month:8,Quantity:11155,Quantity_Electric:333,Quantity_Hybrid:522,Quantity_Diesel:7807,Avg_CO2:130,Diesel_Share:70.0,Electric_Share:2.98},{Year:2012,Month:9,Quantity:11271,Quantity_Electric:343,Quantity_Hybrid:537,Quantity_Diesel:7917,Avg_CO2:130,Diesel_Share:70.2,Electric_Share:3.04},{Year:2012,Month:10,Quantity:12447,Quantity_Electric:378,Quantity_Hybrid:601,Quantity_Diesel:8659,Avg_CO2:130,Diesel_Share:69.6,Electric_Share:3.04},{Year:2012,Month:11,Quantity:10993,Quantity_Electric:335,Quantity_Hybrid:568,Quantity_Diesel:7684,Avg_CO2:130,Diesel_Share:69.9,Electric_Share:3.05},{Year:2012,Month:12,Quantity:10534,Quantity_Electric:228,Quantity_Hybrid:608,Quantity_Diesel:8362,Avg_CO2:130,Diesel_Share:79.4,Electric_Share:2.16},
+  {Year:2013,Month:1,Quantity:10604,Quantity_Electric:446,Quantity_Hybrid:580,Quantity_Diesel:7225,Avg_CO2:124,Diesel_Share:68.1,Electric_Share:4.21},{Year:2013,Month:2,Quantity:10278,Quantity_Electric:598,Quantity_Hybrid:617,Quantity_Diesel:7104,Avg_CO2:123,Diesel_Share:69.1,Electric_Share:5.82},{Year:2013,Month:3,Quantity:14697,Quantity_Electric:811,Quantity_Hybrid:881,Quantity_Diesel:9863,Avg_CO2:123,Diesel_Share:67.1,Electric_Share:5.52},{Year:2013,Month:4,Quantity:12162,Quantity_Electric:671,Quantity_Hybrid:754,Quantity_Diesel:8001,Avg_CO2:123,Diesel_Share:65.8,Electric_Share:5.52},{Year:2013,Month:5,Quantity:13617,Quantity_Electric:772,Quantity_Hybrid:862,Quantity_Diesel:8803,Avg_CO2:122,Diesel_Share:64.6,Electric_Share:5.67},{Year:2013,Month:6,Quantity:12749,Quantity_Electric:720,Quantity_Hybrid:833,Quantity_Diesel:8215,Avg_CO2:123,Diesel_Share:64.4,Electric_Share:5.65},{Year:2013,Month:7,Quantity:11555,Quantity_Electric:665,Quantity_Hybrid:761,Quantity_Diesel:7426,Avg_CO2:123,Diesel_Share:64.3,Electric_Share:5.75},{Year:2013,Month:8,Quantity:11660,Quantity_Electric:665,Quantity_Hybrid:789,Quantity_Diesel:7412,Avg_CO2:123,Diesel_Share:63.6,Electric_Share:5.70},{Year:2013,Month:9,Quantity:12001,Quantity_Electric:698,Quantity_Hybrid:795,Quantity_Diesel:7615,Avg_CO2:123,Diesel_Share:63.5,Electric_Share:5.82},{Year:2013,Month:10,Quantity:12813,Quantity_Electric:720,Quantity_Hybrid:874,Quantity_Diesel:8039,Avg_CO2:123,Diesel_Share:62.7,Electric_Share:5.62},{Year:2013,Month:11,Quantity:11488,Quantity_Electric:671,Quantity_Hybrid:787,Quantity_Diesel:7167,Avg_CO2:122,Diesel_Share:62.4,Electric_Share:5.84},{Year:2013,Month:12,Quantity:10527,Quantity_Electric:645,Quantity_Hybrid:644,Quantity_Diesel:6349,Avg_CO2:122,Diesel_Share:60.3,Electric_Share:6.13},
+  {Year:2014,Month:1,Quantity:10682,Quantity_Electric:1087,Quantity_Hybrid:762,Quantity_Diesel:6616,Avg_CO2:113,Diesel_Share:61.9,Electric_Share:10.18},{Year:2014,Month:2,Quantity:10479,Quantity_Electric:1219,Quantity_Hybrid:753,Quantity_Diesel:6362,Avg_CO2:111,Diesel_Share:60.7,Electric_Share:11.63},{Year:2014,Month:3,Quantity:15115,Quantity_Electric:2042,Quantity_Hybrid:1108,Quantity_Diesel:9101,Avg_CO2:110,Diesel_Share:60.2,Electric_Share:13.51},{Year:2014,Month:4,Quantity:12403,Quantity_Electric:1621,Quantity_Hybrid:939,Quantity_Diesel:7412,Avg_CO2:110,Diesel_Share:59.8,Electric_Share:13.07},{Year:2014,Month:5,Quantity:13573,Quantity_Electric:1758,Quantity_Hybrid:1052,Quantity_Diesel:8045,Avg_CO2:110,Diesel_Share:59.3,Electric_Share:12.95},{Year:2014,Month:6,Quantity:13094,Quantity_Electric:1723,Quantity_Hybrid:1050,Quantity_Diesel:7742,Avg_CO2:110,Diesel_Share:59.1,Electric_Share:13.16},{Year:2014,Month:7,Quantity:11518,Quantity_Electric:1419,Quantity_Hybrid:942,Quantity_Diesel:6875,Avg_CO2:110,Diesel_Share:59.7,Electric_Share:12.32},{Year:2014,Month:8,Quantity:11804,Quantity_Electric:1558,Quantity_Hybrid:975,Quantity_Diesel:6967,Avg_CO2:110,Diesel_Share:59.0,Electric_Share:13.20},{Year:2014,Month:9,Quantity:12459,Quantity_Electric:1671,Quantity_Hybrid:1014,Quantity_Diesel:7338,Avg_CO2:109,Diesel_Share:58.9,Electric_Share:13.41},{Year:2014,Month:10,Quantity:12668,Quantity_Electric:1735,Quantity_Hybrid:1037,Quantity_Diesel:7360,Avg_CO2:109,Diesel_Share:58.1,Electric_Share:13.70},{Year:2014,Month:11,Quantity:11303,Quantity_Electric:1474,Quantity_Hybrid:920,Quantity_Diesel:6467,Avg_CO2:110,Diesel_Share:57.2,Electric_Share:13.04},{Year:2014,Month:12,Quantity:9104,Quantity_Electric:787,Quantity_Hybrid:1049,Quantity_Diesel:6008,Avg_CO2:110,Diesel_Share:66.0,Electric_Share:8.64},
+  {Year:2015,Month:1,Quantity:11278,Quantity_Electric:1497,Quantity_Hybrid:1303,Quantity_Diesel:5950,Avg_CO2:101,Diesel_Share:52.8,Electric_Share:13.27},{Year:2015,Month:2,Quantity:10938,Quantity_Electric:1800,Quantity_Hybrid:1373,Quantity_Diesel:5565,Avg_CO2:100,Diesel_Share:50.9,Electric_Share:16.46},{Year:2015,Month:3,Quantity:15600,Quantity_Electric:2919,Quantity_Hybrid:2011,Quantity_Diesel:7720,Avg_CO2:99,Diesel_Share:49.5,Electric_Share:18.71},{Year:2015,Month:4,Quantity:13286,Quantity_Electric:2330,Quantity_Hybrid:1785,Quantity_Diesel:6356,Avg_CO2:100,Diesel_Share:47.8,Electric_Share:17.54},{Year:2015,Month:5,Quantity:13896,Quantity_Electric:2391,Quantity_Hybrid:1784,Quantity_Diesel:6603,Avg_CO2:100,Diesel_Share:47.5,Electric_Share:17.21},{Year:2015,Month:6,Quantity:12916,Quantity_Electric:2113,Quantity_Hybrid:1692,Quantity_Diesel:6219,Avg_CO2:100,Diesel_Share:48.2,Electric_Share:16.36},{Year:2015,Month:7,Quantity:11327,Quantity_Electric:1848,Quantity_Hybrid:1444,Quantity_Diesel:5374,Avg_CO2:100,Diesel_Share:47.4,Electric_Share:16.31},{Year:2015,Month:8,Quantity:12601,Quantity_Electric:2016,Quantity_Hybrid:1624,Quantity_Diesel:5871,Avg_CO2:99,Diesel_Share:46.6,Electric_Share:16.0},{Year:2015,Month:9,Quantity:12904,Quantity_Electric:2112,Quantity_Hybrid:1671,Quantity_Diesel:6041,Avg_CO2:100,Diesel_Share:46.8,Electric_Share:16.37},{Year:2015,Month:10,Quantity:13327,Quantity_Electric:2263,Quantity_Hybrid:1733,Quantity_Diesel:6211,Avg_CO2:100,Diesel_Share:46.6,Electric_Share:16.98},{Year:2015,Month:11,Quantity:13038,Quantity_Electric:2178,Quantity_Hybrid:1630,Quantity_Diesel:5949,Avg_CO2:100,Diesel_Share:45.6,Electric_Share:16.70},{Year:2015,Month:12,Quantity:9575,Quantity_Electric:2321,Quantity_Hybrid:1423,Quantity_Diesel:4802,Avg_CO2:100,Diesel_Share:50.2,Electric_Share:24.24},
+  {Year:2016,Month:1,Quantity:11044,Quantity_Electric:1986,Quantity_Hybrid:3248,Quantity_Diesel:3793,Avg_CO2:94,Diesel_Share:34.3,Electric_Share:18.0},{Year:2016,Month:2,Quantity:11530,Quantity_Electric:2271,Quantity_Hybrid:3464,Quantity_Diesel:3929,Avg_CO2:93,Diesel_Share:34.1,Electric_Share:19.7},{Year:2016,Month:3,Quantity:15765,Quantity_Electric:3391,Quantity_Hybrid:5012,Quantity_Diesel:5116,Avg_CO2:93,Diesel_Share:32.5,Electric_Share:21.5},{Year:2016,Month:4,Quantity:14116,Quantity_Electric:1993,Quantity_Hybrid:3550,Quantity_Diesel:5086,Avg_CO2:93,Diesel_Share:36.0,Electric_Share:14.1},{Year:2016,Month:5,Quantity:12864,Quantity_Electric:1423,Quantity_Hybrid:3449,Quantity_Diesel:4661,Avg_CO2:93,Diesel_Share:36.2,Electric_Share:11.1},{Year:2016,Month:6,Quantity:13681,Quantity_Electric:1906,Quantity_Hybrid:3174,Quantity_Diesel:4750,Avg_CO2:93,Diesel_Share:34.7,Electric_Share:13.9},{Year:2016,Month:7,Quantity:11040,Quantity_Electric:1103,Quantity_Hybrid:2917,Quantity_Diesel:4077,Avg_CO2:93,Diesel_Share:36.9,Electric_Share:10.0},{Year:2016,Month:8,Quantity:13232,Quantity_Electric:2014,Quantity_Hybrid:3676,Quantity_Diesel:4714,Avg_CO2:93,Diesel_Share:35.6,Electric_Share:15.2},{Year:2016,Month:9,Quantity:13854,Quantity_Electric:2629,Quantity_Hybrid:3991,Quantity_Diesel:4749,Avg_CO2:93,Diesel_Share:34.3,Electric_Share:19.0},{Year:2016,Month:10,Quantity:11932,Quantity_Electric:1861,Quantity_Hybrid:3209,Quantity_Diesel:4190,Avg_CO2:93,Diesel_Share:35.1,Electric_Share:15.6},{Year:2016,Month:11,Quantity:13194,Quantity_Electric:2567,Quantity_Hybrid:3181,Quantity_Diesel:4538,Avg_CO2:93,Diesel_Share:34.4,Electric_Share:19.5},{Year:2016,Month:12,Quantity:13602,Quantity_Electric:2319,Quantity_Hybrid:2597,Quantity_Diesel:6265,Avg_CO2:93,Diesel_Share:46.1,Electric_Share:17.0}
+];
+
+const ANNUAL = [
+  {Year:2007,qty:129195,electric:0,hybrid:0,diesel:96037,avg_co2:159.0,yoy:null},
+  {Year:2008,qty:110617,electric:0,hybrid:0,diesel:80289,avg_co2:158.0,yoy:-14.4},
+  {Year:2009,qty:98675,electric:0,hybrid:0,diesel:71746,avg_co2:150.9,yoy:-10.8},
+  {Year:2010,qty:127754,electric:0,hybrid:0,diesel:95736,avg_co2:140.7,yoy:29.5},
+  {Year:2011,qty:138345,electric:1996,hybrid:3903,diesel:104549,avg_co2:134.0,yoy:8.3},
+  {Year:2012,qty:137967,electric:3950,hybrid:6142,diesel:88734,avg_co2:129.9,yoy:-0.3},
+  {Year:2013,qty:142151,electric:7882,hybrid:9177,diesel:75119,avg_co2:123.0,yoy:3.0},
+  {Year:2014,qty:144202,electric:18094,hybrid:11591,diesel:70293,avg_co2:110.4,yoy:1.4},
+  {Year:2015,qty:150686,electric:25788,hybrid:18473,diesel:61661,avg_co2:99.8,yoy:4.5},
+  {Year:2016,qty:154603,electric:24245,hybrid:37926,diesel:48868,avg_co2:93.3,yoy:2.6}
+];
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// ─── STATE ──────────────────────────────────────────────────────────────────
+let state = { yearFrom: 2007, yearTo: 2016, month: 'all', metric: 'qty', page: 'overview' };
+let charts = {};
+let tableSortKey = 'year', tableSortDir = 1;
+
+// ─── HELPERS ────────────────────────────────────────────────────────────────
+function fmtN(n) { return n == null ? '—' : Math.round(n).toLocaleString(); }
+function fmtPct(n, decimals=1) { return n == null ? '—' : n.toFixed(decimals) + '%'; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return [r,g,b];
+}
+function heatColor(val, min, max) {
+  const t = (val - min) / (max - min || 1);
+  const r = Math.round(lerp(30, 0, t)), g = Math.round(lerp(55, 200, t)), b = Math.round(lerp(150, 100, t));
+  return `rgba(${r},${g},${b},${0.3 + t*0.7})`;
+}
+
+// ─── FILTER DATA ─────────────────────────────────────────────────────────────
+function filteredMonthly() {
+  return MONTHLY.filter(d => {
+    if (d.Year < state.yearFrom || d.Year > state.yearTo) return false;
+    if (state.month !== 'all' && d.Month !== +state.month) return false;
+    return true;
+  });
+}
+function filteredAnnual() {
+  return ANNUAL.filter(d => d.Year >= state.yearFrom && d.Year <= state.yearTo);
+}
+
+// ─── TOOLTIP ─────────────────────────────────────────────────────────────────
+const tooltip = document.getElementById('tooltip');
+function showTip(e, html) {
+  tooltip.innerHTML = html;
+  tooltip.classList.add('visible');
+  moveTip(e);
+}
+function moveTip(e) {
+  const x = e.clientX + 14, y = e.clientY - 10;
+  tooltip.style.left = Math.min(x, window.innerWidth - 220) + 'px';
+  tooltip.style.top = y + 'px';
+}
+function hideTip() { tooltip.classList.remove('visible'); }
+
+// ─── CHART DEFAULTS ─────────────────────────────────────────────────────────
+Chart.defaults.color = '#6b7694';
+Chart.defaults.font.family = "'DM Mono', monospace";
+Chart.defaults.font.size = 11;
+
+function baseOpts(extra = {}) {
+  return {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: 'rgba(255,255,255,0.1)',
+        borderWidth: 1,
+        titleColor: '#00d4ff',
+        bodyColor: '#e8eaf0',
+        padding: 10,
+        cornerRadius: 8
+      }
+    },
+    scales: {
+      x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { maxRotation: 0 } },
+      y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v } }
+    },
+    ...extra
+  };
+}
+
+function mkChart(id, type, data, opts) {
+  const ctx = document.getElementById(id);
+  if (!ctx) return null;
+  if (charts[id]) { charts[id].destroy(); }
+  charts[id] = new Chart(ctx, { type, data, options: opts });
+  return charts[id];
+}
+
+// ─── KPI CARDS ───────────────────────────────────────────────────────────────
+function renderKPIs() {
+  const data = filteredMonthly();
+  const annual = filteredAnnual();
+  const totalQty = data.reduce((s,d) => s + d.Quantity, 0);
+  const totalElec = data.reduce((s,d) => s + d.Quantity_Electric, 0);
+  const avgMonthly = totalQty / (data.length || 1);
+  const latestElecShare = data.length ? data[data.length-1].Electric_Share : 0;
+  const avgCO2 = data.reduce((s,d) => s + d.Avg_CO2, 0) / (data.length || 1);
+  const firstCO2 = annual.length ? annual[0].avg_co2 : 0;
+  const lastCO2 = annual.length ? annual[annual.length-1].avg_co2 : 0;
+  const co2Change = lastCO2 - firstCO2;
+
+  document.getElementById('kpi-row').innerHTML = `
+    <div class="kpi-card" style="--kpi-accent:#00d4ff">
+      <div class="kpi-label">Total registrations</div>
+      <div class="kpi-value">${(totalQty/1000).toFixed(0)}k</div>
+      <div class="kpi-sub">selected period · <span class="badge badge-blue">${data.length} months</span></div>
+    </div>
+    <div class="kpi-card" style="--kpi-accent:#10b981">
+      <div class="kpi-label">Avg monthly sales</div>
+      <div class="kpi-value">${Math.round(avgMonthly).toLocaleString()}</div>
+      <div class="kpi-sub">units per month</div>
+    </div>
+    <div class="kpi-card" style="--kpi-accent:#7c3aed">
+      <div class="kpi-label">Electric share (latest)</div>
+      <div class="kpi-value">${latestElecShare.toFixed(1)}%</div>
+      <div class="kpi-sub">of monthly registrations <span class="badge badge-green">↑ growing</span></div>
+    </div>
+    <div class="kpi-card" style="--kpi-accent:#f43f5e">
+      <div class="kpi-label">Avg CO₂</div>
+      <div class="kpi-value">${Math.round(avgCO2)} <span style="font-size:14px;font-weight:500">g/km</span></div>
+      <div class="kpi-sub"><span class="badge ${co2Change < 0 ? 'badge-green' : 'badge-red'}">${co2Change > 0 ? '+' : ''}${co2Change.toFixed(0)} g/km</span></div>
+    </div>
+  `;
+}
+
+function renderEVKPIs() {
+  const data = filteredMonthly();
+  const annual = filteredAnnual();
+  const totalElec = data.reduce((s,d) => s+d.Quantity_Electric, 0);
+  const totalHybrid = data.reduce((s,d) => s+d.Quantity_Hybrid, 0);
+  const totalQty = data.reduce((s,d) => s+d.Quantity, 0);
+  const evShare = totalQty ? (totalElec/totalQty*100) : 0;
+  const peakElecMonth = data.reduce((a,b) => b.Quantity_Electric > (a?.Quantity_Electric||0) ? b : a, data[0]);
+  document.getElementById('ev-kpi-row').innerHTML = `
+    <div class="kpi-card" style="--kpi-accent:#10b981">
+      <div class="kpi-label">Total EV units</div>
+      <div class="kpi-value">${fmtN(totalElec)}</div>
+      <div class="kpi-sub">electric registrations</div>
+    </div>
+    <div class="kpi-card" style="--kpi-accent:#7c3aed">
+      <div class="kpi-label">Total Hybrid units</div>
+      <div class="kpi-value">${fmtN(totalHybrid)}</div>
+      <div class="kpi-sub">hybrid registrations</div>
+    </div>
+    <div class="kpi-card" style="--kpi-accent:#00d4ff">
+      <div class="kpi-label">EV market share</div>
+      <div class="kpi-value">${evShare.toFixed(1)}%</div>
+      <div class="kpi-sub">of total period sales</div>
+    </div>
+    <div class="kpi-card" style="--kpi-accent:#f59e0b">
+      <div class="kpi-label">Peak EV month</div>
+      <div class="kpi-value">${peakElecMonth ? MONTHS[peakElecMonth.Month-1]+' '+peakElecMonth.Year : '—'}</div>
+      <div class="kpi-sub">${peakElecMonth ? fmtN(peakElecMonth.Quantity_Electric)+' units' : ''}</div>
+    </div>
+  `;
+}
+
+function renderCO2KPIs() {
+  const data = filteredMonthly();
+  const annual = filteredAnnual();
+  if (!data.length) return;
+  const avg = data.reduce((s,d) => s+d.Avg_CO2,0)/data.length;
+  const minCO2 = Math.min(...data.map(d=>d.Avg_CO2));
+  const maxCO2 = Math.max(...data.map(d=>d.Avg_CO2));
+  const first = annual[0]?.avg_co2, last = annual[annual.length-1]?.avg_co2;
+  const reduction = first && last ? ((first - last)/first*100) : 0;
+  document.getElementById('co2-kpi-row').innerHTML = `
+    <div class="kpi-card" style="--kpi-accent:#8b5cf6">
+      <div class="kpi-label">Avg CO₂ (period)</div>
+      <div class="kpi-value">${avg.toFixed(0)} <span style="font-size:14px">g/km</span></div>
+      <div class="kpi-sub">all registrations</div>
+    </div>
+    <div class="kpi-card" style="--kpi-accent:#10b981">
+      <div class="kpi-label">Lowest CO₂ month</div>
+      <div class="kpi-value">${minCO2} <span style="font-size:14px">g/km</span></div>
+      <div class="kpi-sub"><span class="badge badge-green">best month</span></div>
+    </div>
+    <div class="kpi-card" style="--kpi-accent:#f43f5e">
+      <div class="kpi-label">Peak CO₂ month</div>
+      <div class="kpi-value">${maxCO2} <span style="font-size:14px">g/km</span></div>
+      <div class="kpi-sub"><span class="badge badge-red">highest</span></div>
+    </div>
+    <div class="kpi-card" style="--kpi-accent:#00d4ff">
+      <div class="kpi-label">CO₂ reduction</div>
+      <div class="kpi-value">${reduction.toFixed(1)}%</div>
+      <div class="kpi-sub">first → last year <span class="badge badge-green">↓ improving</span></div>
+    </div>
+  `;
+  document.getElementById('co2-reduction-val').textContent = first && last ? (first-last).toFixed(0) : '—';
+}
+
+function renderGrowthKPIs() {
+  const annual = filteredAnnual();
+  const yoyData = annual.filter(d => d.yoy !== null);
+  const bestYear = yoyData.reduce((a,b) => (b.yoy||0) > (a.yoy||0) ? b : a, yoyData[0]);
+  const worstYear = yoyData.reduce((a,b) => (b.yoy||0) < (a.yoy||0) ? b : a, yoyData[0]);
+  const avgYoY = yoyData.reduce((s,d) => s+(d.yoy||0),0)/(yoyData.length||1);
+  const totalRange = annual.length > 1 ? (annual[annual.length-1].qty - annual[0].qty) / annual[0].qty * 100 : 0;
+  document.getElementById('growth-kpi-row').innerHTML = `
+    <div class="kpi-card" style="--kpi-accent:#00d4ff">
+      <div class="kpi-label">Total growth</div>
+      <div class="kpi-value">${totalRange.toFixed(0)}%</div>
+      <div class="kpi-sub">first → last year in range</div>
+    </div>
+    <div class="kpi-card" style="--kpi-accent:#10b981">
+      <div class="kpi-label">Best YoY</div>
+      <div class="kpi-value">${bestYear ? '+'+bestYear.yoy+'%' : '—'}</div>
+      <div class="kpi-sub">${bestYear ? bestYear.Year : ''} <span class="badge badge-green">record</span></div>
+    </div>
+    <div class="kpi-card" style="--kpi-accent:#f43f5e">
+      <div class="kpi-label">Worst YoY</div>
+      <div class="kpi-value">${worstYear ? worstYear.yoy+'%' : '—'}</div>
+      <div class="kpi-sub">${worstYear ? worstYear.Year : ''} <span class="badge badge-red">2008 crisis</span></div>
+    </div>
+    <div class="kpi-card" style="--kpi-accent:#f59e0b">
+      <div class="kpi-label">Avg annual growth</div>
+      <div class="kpi-value">${avgYoY.toFixed(1)}%</div>
+      <div class="kpi-sub">mean YoY across period</div>
+    </div>
+  `;
+}
+
+// ─── OVERVIEW CHARTS ─────────────────────────────────────────────────────────
+function renderTimeSeries() {
+  const data = filteredMonthly();
+  const labels = data.map(d => MONTHS[d.Month-1] + " '" + String(d.Year).slice(2));
+  mkChart('timeseries-chart', 'line', {
+    labels,
+    datasets: [
+      {
+        label: 'Total', data: data.map(d => d.Quantity),
+        borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,0.06)',
+        borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, fill: true, tension: 0.3
+      },
+      {
+        label: 'Electric', data: data.map(d => d.Quantity_Electric),
+        borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.06)',
+        borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4, fill: true, tension: 0.4
+      },
+      {
+        label: 'Hybrid', data: data.map(d => d.Quantity_Hybrid),
+        borderColor: '#7c3aed', borderDash: [5,3],
+        borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.4
+      }
+    ]
+  }, { ...baseOpts(), scales: { x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { maxTicksLimit: 14, maxRotation: 45 } }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v } } } });
+}
+
+function renderDonut() {
+  const data = filteredMonthly();
+  const electric = data.reduce((s,d) => s+d.Quantity_Electric,0);
+  const hybrid = data.reduce((s,d) => s+d.Quantity_Hybrid,0);
+  const diesel = data.reduce((s,d) => s+d.Quantity_Diesel,0);
+  const total = data.reduce((s,d) => s+d.Quantity,0);
+  const other = Math.max(0, total - electric - hybrid - diesel);
+  mkChart('donut-chart', 'doughnut', {
+    labels: ['Diesel','Hybrid','Electric','Other/Petrol'],
+    datasets: [{ data: [diesel,hybrid,electric,other], backgroundColor: ['#f43f5e','#7c3aed','#10b981','#6b7694'], borderColor: '#111827', borderWidth: 2, hoverOffset: 6 }]
+  }, {
+    responsive: true, maintainAspectRatio: true,
+    cutout: '62%',
+    plugins: {
+      legend: { display: true, position: 'bottom', labels: { color: '#6b7694', font: { size: 10 }, padding: 14, boxWidth: 10 } },
+      tooltip: { backgroundColor: '#1a2235', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1, titleColor: '#00d4ff', bodyColor: '#e8eaf0', padding: 10, cornerRadius: 8,
+        callbacks: { label: ctx => ` ${ctx.label}: ${fmtN(ctx.raw)} (${(ctx.raw/total*100).toFixed(1)}%)` }
+      }
+    }
+  });
+}
+
+function renderStackBar() {
+  const annual = filteredAnnual();
+  const labels = annual.map(d => d.Year);
+  const other = annual.map(d => Math.max(0, d.qty - d.electric - d.hybrid - d.diesel));
+  mkChart('stack-bar-chart', 'bar', {
+    labels,
+    datasets: [
+      { label: 'Diesel', data: annual.map(d=>d.diesel), backgroundColor: 'rgba(244,63,94,0.75)', stack: 'a' },
+      { label: 'Hybrid', data: annual.map(d=>d.hybrid), backgroundColor: 'rgba(124,58,237,0.75)', stack: 'a' },
+      { label: 'Electric', data: annual.map(d=>d.electric), backgroundColor: 'rgba(16,185,129,0.85)', stack: 'a' },
+      { label: 'Other', data: other, backgroundColor: 'rgba(107,118,148,0.5)', stack: 'a' }
+    ]
+  }, { ...baseOpts(), plugins: { ...baseOpts().plugins, legend: { display: true, position: 'bottom', labels: { color: '#6b7694', font: { size: 10 }, padding: 12, boxWidth: 10 } } } });
+}
+
+function renderHeatmap() {
+  const data = filteredMonthly();
+  const years = [...new Set(data.map(d=>d.Year))].sort();
+  const grid = {};
+  data.forEach(d => { grid[`${d.Year}-${d.Month}`] = d.Quantity; });
+  const allVals = Object.values(grid);
+  const minV = Math.min(...allVals), maxV = Math.max(...allVals);
+
+  let html = '<div class="heatmap-grid">';
+  html += '<div class="hm-cell hm-label"></div>';
+  for (let m=1; m<=12; m++) html += `<div class="hm-cell hm-header">${MONTHS[m-1].slice(0,1)}</div>`;
+  years.forEach(yr => {
+    html += `<div class="hm-cell hm-label" style="font-size:10px;color:var(--muted)">${yr}</div>`;
+    for (let m=1; m<=12; m++) {
+      const v = grid[`${yr}-${m}`];
+      if (v) {
+        const c = heatColor(v, minV, maxV);
+        html += `<div class="hm-cell" style="background:${c}" onmouseenter="showTip(event,'<strong>${MONTHS[m-1]} ${yr}</strong><br>${fmtN(v)} units')" onmousemove="moveTip(event)" onmouseleave="hideTip()"></div>`;
+      } else {
+        html += `<div class="hm-cell" style="background:rgba(255,255,255,0.02)"></div>`;
+      }
+    }
+  });
+  html += '</div>';
+  document.getElementById('heatmap-wrap').innerHTML = html;
+}
+
+// ─── EV CHARTS ───────────────────────────────────────────────────────────────
+function renderEVCharts() {
+  const annual = filteredAnnual();
+  const monthly = filteredMonthly();
+
+  mkChart('ev-bar-chart', 'bar', {
+    labels: annual.map(d=>d.Year),
+    datasets: [
+      { label: 'Electric', data: annual.map(d=>d.electric), backgroundColor: 'rgba(16,185,129,0.8)', borderRadius: 4, borderSkipped: false },
+      { label: 'Hybrid', data: annual.map(d=>d.hybrid), backgroundColor: 'rgba(124,58,237,0.7)', borderRadius: 4, borderSkipped: false }
+    ]
+  }, { ...baseOpts(), plugins: { ...baseOpts().plugins, legend: { display: true, position: 'bottom', labels: { color: '#6b7694', font: { size: 10 }, padding: 12, boxWidth: 10 } } } });
+
+  const labels2 = monthly.map(d => MONTHS[d.Month-1]+" '"+String(d.Year).slice(2));
+  mkChart('ev-share-chart', 'line', {
+    labels: labels2,
+    datasets: [{
+      label: 'EV Share %', data: monthly.map(d => d.Electric_Share),
+      borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)',
+      borderWidth: 2, pointRadius: 0, fill: true, tension: 0.4
+    }]
+  }, { ...baseOpts(), scales: { x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { maxTicksLimit: 14, maxRotation: 45 } }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: v => v+'%' } } } });
+
+  mkChart('ev-vs-diesel-chart', 'line', {
+    labels: annual.map(d=>d.Year),
+    datasets: [
+      { label:'Electric', data: annual.map(d=>d.electric), borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.05)', borderWidth:2, pointRadius:4, fill:true, tension:0.3 },
+      { label:'Hybrid',   data: annual.map(d=>d.hybrid),   borderColor:'#7c3aed', backgroundColor:'rgba(124,58,237,0.05)', borderWidth:2, pointRadius:4, fill:true, tension:0.3 },
+      { label:'Diesel',   data: annual.map(d=>d.diesel),   borderColor:'#f43f5e', backgroundColor:'rgba(244,63,94,0.05)',  borderWidth:2, pointRadius:4, fill:true, tension:0.3 }
+    ]
+  }, { ...baseOpts(), plugins: { ...baseOpts().plugins, legend: { display: true, position: 'bottom', labels: { color: '#6b7694', font: { size: 10 }, padding: 12, boxWidth: 10 } } } });
+}
+
+// ─── EMISSIONS CHARTS ────────────────────────────────────────────────────────
+function renderEmissionsCharts() {
+  const annual = filteredAnnual();
+  const monthly = filteredMonthly();
+
+  mkChart('co2-line-chart', 'line', {
+    labels: annual.map(d=>d.Year),
+    datasets: [{
+      label: 'Avg CO₂ (g/km)', data: annual.map(d=>d.avg_co2),
+      borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)',
+      borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#8b5cf6', fill: true, tension: 0.3
+    }]
+  }, { ...baseOpts(), scales: { x: { grid: { color: 'rgba(255,255,255,0.04)' } }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: v => v+' g' }, min: 60 } } });
+
+  mkChart('co2-gauge-chart', 'bar', {
+    labels: annual.map(d=>d.Year),
+    datasets: [{ data: annual.map(d=>d.avg_co2), backgroundColor: annual.map(d => `hsl(${280 - (d.avg_co2-85)*1.4}, 70%, 60%)`), borderRadius: 4 }]
+  }, { ...baseOpts(), scales: { x: { grid: { display: false }, ticks: { font: { size: 9 } } }, y: { grid: { display: false }, display: false } } });
+
+  const labels2 = monthly.map(d => MONTHS[d.Month-1]+" '"+String(d.Year).slice(2));
+  mkChart('fuel-co2-chart', 'line', {
+    labels: labels2,
+    datasets: [
+      { label:'Diesel CO₂', data: monthly.map(d=>d.Diesel_Co2||null), borderColor:'#f43f5e', borderWidth:1.5, pointRadius:0, tension:0.4 },
+      { label:'Petrol CO₂', data: monthly.map(d=>d.Bensin_Co2||null), borderColor:'#f59e0b', borderWidth:1.5, pointRadius:0, tension:0.4 }
+    ]
+  }, { ...baseOpts(), scales: { x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { maxTicksLimit: 14, maxRotation: 45 } }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: v => v+' g' } } } });
+}
+
+// ─── GROWTH CHARTS ───────────────────────────────────────────────────────────
+function renderGrowthCharts() {
+  const annual = filteredAnnual().filter(d => d.yoy !== null);
+
+  mkChart('yoy-chart', 'bar', {
+    labels: annual.map(d=>d.Year),
+    datasets: [{
+      label: 'YoY Growth %',
+      data: annual.map(d=>d.yoy),
+      backgroundColor: annual.map(d => d.yoy >= 0 ? 'rgba(16,185,129,0.75)' : 'rgba(244,63,94,0.75)'),
+      borderRadius: 5, borderSkipped: false
+    }]
+  }, { ...baseOpts(), scales: { x: { grid: { color: 'rgba(255,255,255,0.04)' } }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: v => v+'%' } } } });
+
+  // Seasonality
+  const monthAvg = Array(12).fill(0).map((_,i) => {
+    const mData = filteredMonthly().filter(d => d.Month === i+1);
+    return mData.length ? mData.reduce((s,d) => s+d.Quantity,0)/mData.length : 0;
+  });
+  mkChart('seasonality-chart', 'bar', {
+    labels: MONTHS,
+    datasets: [{ label: 'Avg sales', data: monthAvg, backgroundColor: monthAvg.map(v => `rgba(0,212,255,${0.3 + (v/Math.max(...monthAvg))*0.6})`), borderRadius: 4 }]
+  }, baseOpts());
+
+  renderTable();
+}
+
+// ─── TABLE ───────────────────────────────────────────────────────────────────
+function sortTable(key) {
+  if (tableSortKey === key) tableSortDir *= -1;
+  else { tableSortKey = key; tableSortDir = 1; }
+  renderTable();
+}
+function renderTable() {
+  const annual = [...filteredAnnual()].sort((a, b) => {
+    const map = { year: 'Year', qty: 'qty', yoy: 'yoy', electric: 'electric', hybrid: 'hybrid', co2: 'avg_co2' };
+    const k = map[tableSortKey];
+    return ((a[k]||0) - (b[k]||0)) * tableSortDir;
+  });
+  const maxQty = Math.max(...annual.map(d=>d.qty));
+  const tbody = document.getElementById('table-body');
+  if (!tbody) return;
+  tbody.innerHTML = annual.map(d => `
+    <tr>
+      <td>${d.Year}</td>
+      <td>${fmtN(d.qty)}<span class="tbl-bar" style="width:${d.qty/maxQty*60}px;background:#00d4ff;opacity:.5"></span></td>
+      <td class="${d.yoy === null ? '' : d.yoy >= 0 ? 'tbl-pos' : 'tbl-neg'}">${d.yoy !== null ? (d.yoy > 0 ? '+' : '') + d.yoy + '%' : '—'}</td>
+      <td>${fmtN(d.electric)}</td>
+      <td>${fmtN(d.hybrid)}</td>
+      <td>${d.avg_co2} g/km</td>
+    </tr>`).join('');
+}
+
+// ─── RENDER ALL ──────────────────────────────────────────────────────────────
+function renderAll() {
+  const page = state.page;
+  if (page === 'overview') {
+    renderKPIs();
+    renderTimeSeries();
+    renderDonut();
+    renderStackBar();
+    renderHeatmap();
+  } else if (page === 'ev') {
+    renderEVKPIs();
+    renderEVCharts();
+  } else if (page === 'emissions') {
+    renderCO2KPIs();
+    renderEmissionsCharts();
+  } else if (page === 'growth') {
+    renderGrowthKPIs();
+    renderGrowthCharts();
+  }
+  updateFilterSummary();
+}
+
+// ─── FILTER EVENTS ───────────────────────────────────────────────────────────
+function onFilterChange() {
+  const yf = +document.getElementById('year-from').value;
+  const yt = +document.getElementById('year-to').value;
+  state.yearFrom = Math.min(yf, yt);
+  state.yearTo = Math.max(yf, yt);
+  document.getElementById('year-from').value = state.yearFrom;
+  document.getElementById('year-to').value = state.yearTo;
+  document.getElementById('year-from-val').textContent = state.yearFrom;
+  document.getElementById('year-to-val').textContent = state.yearTo;
+  state.month = document.getElementById('month-filter').value;
+  state.metric = document.getElementById('metric-filter').value;
+  renderAll();
+}
+function resetFilters() {
+  state = { yearFrom: 2007, yearTo: 2016, month: 'all', metric: 'qty', page: state.page };
+  document.getElementById('year-from').value = 2007;
+  document.getElementById('year-to').value = 2016;
+  document.getElementById('year-from-val').textContent = '2007';
+  document.getElementById('year-to-val').textContent = '2016';
+  document.getElementById('month-filter').value = 'all';
+  document.getElementById('metric-filter').value = 'qty';
+  renderAll();
+}
+function updateFilterSummary() {
+  const mLabel = state.month === 'all' ? 'All months' : MONTHS[+state.month - 1];
+  document.getElementById('filter-summary').textContent = `${state.yearFrom}–${state.yearTo} · ${mLabel}`;
+}
+
+// ─── PAGE NAV ────────────────────────────────────────────────────────────────
+function showPage(name) {
+  state.page = name;
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  const tabs = ['overview','ev','emissions','growth'];
+  document.querySelectorAll('.nav-tab')[tabs.indexOf(name)]?.classList.add('active');
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name)?.classList.add('active');
+  renderAll();
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+renderAll();
+</script>
+</body>
+</html>
